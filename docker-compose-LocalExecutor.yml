@@ -1,0 +1,62 @@
+version: '3.7'
+services:
+    postgres:
+        image: postgres:9.6
+        container_name: airflow_db
+        environment:
+            - POSTGRES_USER=airflow
+            - POSTGRES_PASSWORD=airflow
+            - POSTGRES_DB=airflow
+            - POSTGRES_HOST_AUTH_METHOD=trust
+        ports:
+            - 5432:5432        
+        logging:
+           options:
+               max-size: 10m
+               max-file: "3"
+
+    webserver:
+        image: puckel/docker-airflow:1.10.9
+        container_name: airflow
+        restart: always
+        depends_on:
+            - postgres
+        environment:
+            - LOAD_EX=n
+            - EXECUTOR=Local            
+        volumes:
+            - ./dags:/usr/local/airflow/dags
+            - ./sql:/usr/local/airflow/sql
+            - ./src:/usr/local/airflow/src
+            - ./lz:/usr/local/airflow/lz
+            - ./archive:/usr/local/airflow/archive
+            - ./output:/usr/local/airflow/output
+        ports:
+            - "8084:8080"
+        command: webserver
+        healthcheck:
+            test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+            interval: 30s
+            timeout: 30s
+            retries: 3
+    dwh:
+        image: postgres:9.6
+        container_name: dwh_db
+        environment:
+            - POSTGRES_USER=dwh_user
+            - POSTGRES_PASSWORD=dwh_user
+            - POSTGRES_DB=dwh
+            - POSTGRES_HOST_AUTH_METHOD=trust
+        ports:
+            - 5433:5432
+        volumes:
+            #- ./initialize/database_user.sql:/docker-entrypoint-initdb.d/database_user.sql
+            #- ./initialize/dwh_tables.sql:/docker-entrypoint-initdb.d/dwh_tables.sql
+            - pgdata:/var/lib/postgresql/data
+        logging:
+           options:
+               max-size: 10m
+               max-file: "3"
+
+volumes:
+    pgdata:
