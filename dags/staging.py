@@ -36,7 +36,7 @@ connection = psycopg2.connect(
     user="dwh_user",
     password="dwh_user",
 )
-connection.autocommit = True
+connection.autocommit = False
 cur = connection.cursor()
 sqlstr_metadata = "COPY staging.metadata (asin, img_url, description, categories, title, price, sales_rank, brand, load_dtm) FROM STDIN DELIMITER '\t' CSV"
 sqlstr_reviews = "COPY staging.reviews (reviewer_id, asin, reviewer_name, helpful, review_text, rating, summary, unix_review_time, review_date) FROM STDIN DELIMITER '\t' CSV"
@@ -94,6 +94,8 @@ def load_to_db(execution_date, **kwargs):
       cur.copy_expert(sqlstr, f)
     total = total + count
     print(f'Total number of copied lines {total}')
+    connection.commit()
+    connection.close()
 
 ## Define the DAG object
 default_args = {
