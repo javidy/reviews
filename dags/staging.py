@@ -8,7 +8,7 @@ from operators.dwh_operators import PostgresOperatorWithTemplatedParams
 from datetime import datetime, timedelta
 import os.path
 from os import path
-import gzip, json, csv, psycopg2
+import gzip, json, csv, psycopg2, glob
 from airflow.models import Variable
 
 
@@ -17,12 +17,17 @@ landing_zone = Variable.get("landing_zone")
 archive_dir = Variable.get("archive_dir")
 tmpl_search_path = Variable.get("sql_path")
 output_dir = Variable.get("output_dir")
-
 lz_metadata_dir, lz_reviews_dir = (f'{landing_zone}/metadata', f'{landing_zone}/reviews')
-metadata_filename = 'NoMetadataFileExists' if len(os.listdir(lz_metadata_dir)) == 0 else os.listdir(lz_metadata_dir)[0]
-reviews_filename = 'NoReviewsFileExists' if len(os.listdir(lz_reviews_dir)) == 0 else os.listdir(lz_reviews_dir)[0]
-input_filenames = [f'{lz_metadata_dir}/{metadata_filename}', f'{lz_reviews_dir}/{reviews_filename}']
-output_filenames = [f'{output_dir}/metadata.csv', f'{output_dir}/reviews.csv']
+pattern = r".json.gz"
+
+def get_source_filename(source_dir):
+    files = [_ for _ in os.listdir(source_dir) if _.endswith(pattern)]
+    if len(files) != 0:
+        return os.path.join(source_dir, files[0])
+    return "SouceFileDoesNotExist"
+
+input_filenames = [get_source_filename(lz_metadata_dir), get_source_filename(lz_reviews_dir)]
+output_filenames = [os.path.join(output_dir, 'metadata.csv'), os.path.join(output_dir, 'reviews.csv')]
 
 
 connection = psycopg2.connect(
