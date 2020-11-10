@@ -39,7 +39,7 @@ connection = psycopg2.connect(
 connection.autocommit = False
 cur = connection.cursor()
 sqlstr_metadata = "COPY staging.metadata (asin, img_url, description, categories, title, price, sales_rank, brand, load_dtm) FROM STDIN DELIMITER '\t' CSV"
-sqlstr_reviews = "COPY staging.reviews (reviewer_id, asin, reviewer_name, helpful, review_text, rating, summary, unix_review_time, review_date) FROM STDIN DELIMITER '\t' CSV"
+sqlstr_reviews = "COPY staging.reviews (reviewer_id, asin, reviewer_name, helpful, review_text, rating, summary, unix_review_time, review_date, load_dtm) FROM STDIN DELIMITER '\t' CSV"
 
 
 def parse(file_name):
@@ -76,7 +76,7 @@ def load_to_db(execution_date, **kwargs):
       if (data_type == "metadata"):
         csv_writer.writerow([l.get("asin",""), l.get("imUrl", ""), l.get("description",""), l.get("categories",""), l.get("title",""), l.get("price", ""), l.get("salesRank",""), l.get("brand",""), execution_date])
       else:
-        csv_writer.writerow([l.get("reviewerID",""), l.get("asin", ""), l.get("reviewerName",""), l.get("helpful",""), l.get("reviewText",""), l.get("overall",""), l.get("summary",""), l.get("unixReviewTime",""), l.get("reviewTime","")])
+        csv_writer.writerow([l.get("reviewerID",""), l.get("asin", ""), l.get("reviewerName",""), l.get("helpful",""), l.get("reviewText",""), l.get("overall",""), l.get("summary",""), l.get("unixReviewTime",""), l.get("reviewTime",""), execution_date])
 
       count = count + 1
       if (count == 100000):    
@@ -125,16 +125,16 @@ archive_metadata = BashOperator(task_id='archive_metadata',
                                 env={'input_filename': input_filenames[0], 'archive_dir': archive_dir},
                                 dag=dag)
 
-archive_reviews = BashOperator(task_id='archive_reviews', 
-                                bash_command="/usr/local/airflow/src/archive.sh ",
-                                env={'input_filename': input_filenames[1], 'archive_dir': archive_dir},
-                                dag=dag)                              
-
 stage_reviews = PythonOperator(task_id='stage_reviews',
                     python_callable=load_to_db,
                     op_kwargs = {"input": input_filenames[1], "output": output_filenames[1], "type": "reviews"},
                     provide_context=True,
-                    dag=dag)                    
+                    dag=dag)
+
+archive_reviews = BashOperator(task_id='archive_reviews', 
+                                bash_command="/usr/local/airflow/src/archive.sh ",
+                                env={'input_filename': input_filenames[1], 'archive_dir': archive_dir},
+                                dag=dag)                 
 
 
 stage_metadata >> archive_metadata

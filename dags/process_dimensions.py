@@ -39,15 +39,8 @@ dag = airflow.DAG(
     max_active_runs=1,
     catchup=False)
 
-""" 
-Have to comment out this task because staging designed to be one time task 
-Initial idea was to extract reviews from source file by reviewTime between execution_start_ts and execution_end_ts (Just like in dimension, fact population)
-However due to challenges in getting spark run in my laptop with this design I had to abandon this idea for now :).
-Hence, "transform_and_stage_reviews" DAG has to be run once to fetch all data and put it into staging table. If activated, externaltasksensor will run forever with current setup
-
-"""
-wait_for_staging = ExternalTaskSensor(
-    task_id='wait_for_staging',
+wait_for_metadata_staging = ExternalTaskSensor(
+    task_id='wait_for_metadata_staging',
     external_dag_id='staging',
     external_task_id='archive_metadata',
     execution_delta=None,  # Same day as today
@@ -61,26 +54,23 @@ process_product_dim = PostgresOperatorWithTemplatedParams(
     dag=dag,
     pool='postgres_dwh')
 
-# process_reviewer_dim = PostgresOperatorWithTemplatedParams(
-#     task_id='process_reviewer_dim',
-#     postgres_conn_id='postgres_dwh',
-#     sql='process_reviewer_dimension.sql',
-#     parameters={"window_start_date": "{{ ds }}", "window_end_date": "{{ tomorrow_ds }}"},
-#     dag=dag,
-#     pool='postgres_dwh')
+wait_for_reviews_staging = ExternalTaskSensor(
+    task_id='wait_for_reviews_staging',
+    external_dag_id='staging',
+    external_task_id='archive_reviews',
+    execution_delta=None,  # Same day as today
+    dag=dag)
 
-# test_bash_operator = BashOperator(task_id='test_bash_operator', 
-#                                 bash_command="echo {{ execution_date }}", 
-#                                 dag=dag) 
+process_reviewer_dim = PostgresOperatorWithTemplatedParams(
+    task_id='process_reviewer_dim',
+    postgres_conn_id='postgres_dwh',
+    sql='process_reviewer_dimension.sql',
+    parameters={"window_start_date": "{{ execution_date }}"},
+    dag=dag,
+    pool='postgres_dwh')
 
-#wait_for_staging >> test_bash_operator
-
-wait_for_staging >> process_product_dim
-# wait_for_staging >> process_reviewer_dim
-
-# process_product_dim
-# process_reviewer_dim
-
+wait_for_metadata_staging >> process_product_dim
+wait_for_reviews_staging >> process_reviewer_dim
 
     
 
