@@ -14,13 +14,13 @@ SELECT
     , COALESCE(p.categories, '')
     , COALESCE(p.sales_rank, '')
     , b.price_bucket_key
-    , CURRENT_TIMESTAMP
+    , TIMESTAMP %(execution_date)s
     , TIMESTAMP '9999-01-01 00:00:00'
 FROM
     staging.metadata p INNER JOIN
     dwh.dim_price_bucket b ON (COALESCE(p.price, 0) >= b.range_start AND COALESCE(p.price, 0) < COALESCE(b.range_end, p.price))
 WHERE 
-    p.load_dtm = %(window_start_date)s;
+    p.load_dtm = %(execution_date)s;
 
 -- Update records by setting an end date
 -- only do this when start_dtm < to be inserted dtm,

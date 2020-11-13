@@ -22,19 +22,21 @@ from airflow.models import Variable
 
 args = {
     'owner': 'airflow',
-    'start_date': airflow.utils.dates.days_ago(8683),
-    'provide_context': True
+    'start_date': datetime(2020, 11, 8, 12, 30),
+    'provide_context': True,
+    'depends_on_past': True
 }
 
 tmpl_search_path = Variable.get("sql_path")
 
 dag = airflow.DAG(
     'process_fact',
-    schedule_interval="@daily",
+    schedule_interval='*/30 * * * *',
     dagrun_timeout=timedelta(minutes=60),
     template_searchpath=tmpl_search_path,
     default_args=args,
-    max_active_runs=1)
+    max_active_runs=1,
+    catchup=False)
 
 wait_for_prod_dim = ExternalTaskSensor(
     task_id='wait_for_prod_dim',
@@ -54,7 +56,7 @@ process_fact = PostgresOperatorWithTemplatedParams(
     task_id='process_fact',
     postgres_conn_id='postgres_dwh',
     sql='process_review_fact.sql',
-    parameters={"window_start_date": "{{ ds }}", "window_end_date": "{{ tomorrow_ds }}"},
+    parameters={"execution_date": "{{ execution_date }}"},
     dag=dag,
     pool='postgres_dwh')
 

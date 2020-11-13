@@ -50,7 +50,7 @@ process_product_dim = PostgresOperatorWithTemplatedParams(
     task_id='process_product_dim',
     postgres_conn_id='postgres_dwh',
     sql='process_product_dimension.sql',
-    parameters={"window_start_date": "{{ execution_date }}"},
+    parameters={"execution_date": "{{ execution_date }}"},
     dag=dag,
     pool='postgres_dwh')
 
@@ -65,7 +65,7 @@ process_reviewer_dim = PostgresOperatorWithTemplatedParams(
     task_id='process_reviewer_dim',
     postgres_conn_id='postgres_dwh',
     sql='process_reviewer_dimension.sql',
-    parameters={"window_start_date": "{{ execution_date }}"},
+    parameters={"execution_date": "{{ execution_date }}"},
     dag=dag,
     pool='postgres_dwh')
 

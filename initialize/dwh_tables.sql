@@ -53,6 +53,7 @@ CREATE TABLE dwh.dim_reviewer (
     reviewer_id  VARCHAR(50) NOT NULL,
     reviewer_name VARCHAR(500) NOT NULL
 );
+CREATE UNIQUE INDEX ON dwh.dim_reviewer (reviewer_id);
 
 CREATE SEQUENCE seq_product START 1;
 GRANT USAGE, SELECT ON SEQUENCE seq_product TO dwh_user;
@@ -97,7 +98,7 @@ CREATE TABLE dwh.fact_reviews (
     date_key   INTEGER NOT NULL REFERENCES dwh.dim_date (date_key),
     reviewer_key     INTEGER NOT NULL REFERENCES dwh.dim_reviewer (reviewer_key),
     product_key      INTEGER NOT NULL REFERENCES dwh.dim_product (product_key),
-    rating           SMALLINT NOT NULL
+    rating           FLOAT NOT NULL
 );
 
 GRANT USAGE ON SCHEMA dwh TO dwh_user;
