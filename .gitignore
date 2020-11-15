@@ -6,9 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
-# data files (.csv , json)
+# data files (.csv , .json, .db)
 *.csv
 *.json.gz
+*.db
 
 # Distribution / packaging
 .Python
