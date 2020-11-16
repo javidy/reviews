@@ -74,10 +74,9 @@ def load_to_db(execution_date, **kwargs):
 
     for l in parse(input_filename):
       if (data_type == "metadata"):
-        csv_writer.writerow([l.get("asin",""), l.get("imUrl", ""), l.get("description",""), l.get("categories",""), l.get("title",""), l.get("price", ""), l.get("salesRank",""), l.get("brand",""), execution_date])
+        csv_writer.writerow([l.get("asin",""), l.get("imUrl", ""), l.get("description",""), l.get("categories",[[""]])[0][0], l.get("title",""), l.get("price", ""), l.get("salesRank",""), l.get("brand",""), execution_date])
       else:
         csv_writer.writerow([l.get("reviewerID",""), l.get("asin", ""), l.get("reviewerName",""), l.get("helpful",""), l.get("reviewText",""), l.get("overall",""), l.get("summary",""), l.get("unixReviewTime",""), l.get("reviewTime",""), execution_date])
-
       count = count + 1
       if (count == 100000):    
         data_file.close()    
