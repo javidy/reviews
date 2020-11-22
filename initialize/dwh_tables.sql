@@ -32,6 +32,19 @@ CREATE TABLE staging.metadata (
     load_dtm        TIMESTAMP  NULL DEFAULT NOW()
 );
 
+CREATE SEQUENCE seq_execution_log START 1;
+GRANT USAGE, SELECT ON SEQUENCE seq_execution_log TO dwh_user;
+
+CREATE TABLE staging.reviews_execution_log (
+    execution_id     INTEGER PRIMARY KEY NOT NULL DEFAULT nextval('seq_execution_log'),
+    execution_ts     TIMESTAMP     NOT NULL,
+    metadata_file 	 VARCHAR(100)  NULL,
+    reviews_file     VARCHAR(100)  NULL,
+    status           VARCHAR(50)   NOT NULL,
+    description      VARCHAR(500)  NULL,    
+    log_ts           TIMESTAMP     NOT NULL
+);
+
 GRANT USAGE ON SCHEMA staging TO dwh_user;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA staging TO dwh_user;
 

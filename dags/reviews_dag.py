@@ -191,6 +191,20 @@ process_fact = PostgresOperatorWithTemplatedParams(
     dag=dag,
     pool='postgres_dwh')
 
+log_success = PostgresOperatorWithTemplatedParams(
+    task_id='log_success',
+    postgres_conn_id='postgres_dwh',
+    sql='insert_execution_log.sql',
+    parameters={
+        "execution_date": "{{ execution_date }}",
+        "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
+        "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
+        "execution_status": "success",
+        "execution_descr": "",
+        },
+    dag=dag,
+    pool='postgres_dwh')
+
 start_op >> branch_op >> [load_staging, no_files_found]
-load_staging >> stage_metadata >> archive_metadata >> process_product_dim >> process_fact
-load_staging >> stage_reviews >> archive_reviews >> process_reviewer_dim >> process_fact
+load_staging >> stage_metadata >> archive_metadata >> process_product_dim >> process_fact >> log_success
+load_staging >> stage_reviews >> archive_reviews >> process_reviewer_dim >> process_fact >> log_success
