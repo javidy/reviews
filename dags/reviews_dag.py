@@ -4,7 +4,6 @@ from airflow.hooks.postgres_hook import PostgresHook
 from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.python_operator import BranchPythonOperator
-from operators.staging_operators import PostgresBulkLoadOperator
 from operators.dwh_operators import PostgresOperatorWithTemplatedParams
 from airflow.operators.dummy_operator import DummyOperator
 from datetime import datetime, timedelta
@@ -199,12 +198,27 @@ log_success = PostgresOperatorWithTemplatedParams(
         "execution_date": "{{ execution_date }}",
         "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
         "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
-        "execution_status": "success",
+        "execution_status": "Success",
         "execution_descr": "",
         },
     dag=dag,
     pool='postgres_dwh')
 
+log_error = PostgresOperatorWithTemplatedParams(
+    task_id='log_error',
+    postgres_conn_id='postgres_dwh',
+    sql='insert_execution_log.sql',
+    parameters={
+        "execution_date": "{{ execution_date }}",
+        "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
+        "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
+        "execution_status": "Error",
+        "execution_descr": f"No files found in landing zone: {landing_zone}",
+        },
+    dag=dag,
+    pool='postgres_dwh')
+
 start_op >> branch_op >> [load_staging, no_files_found]
+no_files_found >> log_error
 load_staging >> stage_metadata >> archive_metadata >> process_product_dim >> process_fact >> log_success
 load_staging >> stage_reviews >> archive_reviews >> process_reviewer_dim >> process_fact >> log_success
