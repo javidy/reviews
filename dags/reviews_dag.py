@@ -1,13 +1,12 @@
 from airflow import DAG
 import airflow
 from airflow.hooks.postgres_hook import PostgresHook
-from airflow.operators.bash_operator import BashOperator
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.python_operator import BranchPythonOperator
 from operators.dwh_operators import PostgresOperatorWithTemplatedParams
 from airflow.operators.dummy_operator import DummyOperator
 from datetime import datetime, timedelta
-import os.path
+import os.path, shutil
 from os import path
 import gzip, json, csv, psycopg2, glob
 from airflow.models import Variable
@@ -42,7 +41,7 @@ default_args = {
 }
 
 def branch_func(**kwargs):    
-    ti = kwargs['ti']    
+    ti = kwargs['ti']
     source_filenames = ti.xcom_pull(task_ids="start_task", key="source_files")
     if source_filenames != None and files_exist(source_filenames):
         print("Both files exists. Proceeding to staging")
@@ -51,7 +50,7 @@ def branch_func(**kwargs):
     return "no_files_found"
     
 def files_exist(files):    
-    return path.exists(files.get("meta", "")) and path.exists(files.get("reviews", ""))
+    return path.exists(files.get("meta").get("src")) and path.exists(files.get("reviews").get("src"))
 
 def detect_src_files(**kwargs):
     source_dir = kwargs['dir']
@@ -60,8 +59,35 @@ def detect_src_files(**kwargs):
     if len(files) != 0:        
         start = files[0].find("_") + 1
         category = files[0][start:]
-        filenames = {"meta": os.path.join(source_dir, f"meta_{category}"), "reviews": os.path.join(source_dir, f"reviews_{category}")}
-        ti.xcom_push(key="source_files", value=filenames)
+        file_names = {"meta": f"meta_{category}", "reviews": f"reviews_{category}"}
+        source_files = {
+            "meta": {
+                "src": os.path.join(source_dir, file_names.get("meta")),
+                "archive": os.path.join(archive_dir, file_names.get("meta"))
+            },
+            "reviews": {
+                "src": os.path.join(source_dir, file_names.get("reviews")),
+                "archive": os.path.join(archive_dir, file_names.get("reviews"))
+            }
+        }
+        ti.xcom_push(key="source_files", value=source_files)
+
+def archive(**kwargs):
+    ti = kwargs['ti']
+    data_type = kwargs["type"]
+    d = ti.xcom_pull(task_ids="start_task", key="source_files")
+    if d != None and data_type == None:
+        for key,value in d.items():
+            src_file = value.get("src", "")
+            if path.exists(src_file):
+                print(f">>> Archiving file {src_file}")
+                shutil.move(src_file, value.get("archive"))
+    elif data_type != None:
+        src_file = d.get(data_type).get("src")
+        print(f">>> Archiving file {src_file}")
+        shutil.move(src_file, d.get(data_type).get("archive"))
+    else:
+        print(">>> No files found")
 
 def parse(file_name):
   if path.exists(file_name):
@@ -72,24 +98,17 @@ def parse(file_name):
   else:
     print(f'File {path} not found')
 
-def parse_strict(path):
-  g = gzip.open(path, 'r')
-  for l in g:
-    yield json.dumps(eval(l))    
-
-
 def load_to_db(execution_date, **kwargs):
-    count, total = (0, 0)    
-    #input_filename, output_filename, data_type = (kwargs["input"], kwargs["output"], kwargs["type"])
-    ti, output_filename, data_type = (kwargs["ti"], kwargs["output"], kwargs["type"])    
+    count, total = (0, 0)
+    ti, output_filename, data_type = (kwargs["ti"], kwargs["output"], kwargs["type"])
 
     if data_type == "metadata":
       sqlstr = sqlstr_metadata
-      input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("meta")
+      input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("meta").get("src")
       print(f'Processing {data_type}')
     else:
       sqlstr = sqlstr_reviews
-      input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("reviews")
+      input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("reviews").get("src")
       print(f'Processing {data_type}')
 
     csv.register_dialect("tabs", delimiter="\t")
@@ -144,16 +163,25 @@ branch_op = BranchPythonOperator(
 load_staging = DummyOperator(task_id='load_staging', dag=dag)
 no_files_found = DummyOperator(task_id='no_files_found', dag=dag)
 
+archive_files = PythonOperator(
+    task_id='archive_files',
+    python_callable=archive,
+    op_kwargs = {"type": None},
+    provide_context=True,
+    dag=dag)
+
 stage_metadata = PythonOperator(task_id='stage_metadata',
                     python_callable=load_to_db,
                     op_kwargs = {"output": output_filenames[0], "type": "metadata"},
                     provide_context=True,
                     dag=dag)
 
-archive_metadata = BashOperator(task_id='archive_metadata', 
-                                bash_command="/usr/local/airflow/src/archive.sh ",
-                                env={'input_filename': '{{ ti.xcom_pull(task_ids="stage_metadata") }}', 'archive_dir': archive_dir},
-                                dag=dag)
+archive_metadata = PythonOperator(
+    task_id='archive_metadata',
+    python_callable=archive,
+    op_kwargs = {"type": "meta"},
+    provide_context=True,
+    dag=dag)
 
 stage_reviews = PythonOperator(task_id='stage_reviews',
                     python_callable=load_to_db,
@@ -161,10 +189,12 @@ stage_reviews = PythonOperator(task_id='stage_reviews',
                     provide_context=True,
                     dag=dag)
 
-archive_reviews = BashOperator(task_id='archive_reviews', 
-                                bash_command="/usr/local/airflow/src/archive.sh ",
-                                env={'input_filename': '{{ ti.xcom_pull(task_ids="stage_reviews") }}', 'archive_dir': archive_dir},
-                                dag=dag)
+archive_reviews = PythonOperator(
+    task_id='archive_reviews',
+    python_callable=archive,
+    op_kwargs = {"type": "reviews"},
+    provide_context=True,
+    dag=dag)
 
 process_product_dim = PostgresOperatorWithTemplatedParams(
     task_id='process_product_dim',
@@ -199,7 +229,7 @@ log_success = PostgresOperatorWithTemplatedParams(
         "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
         "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
         "execution_status": "Success",
-        "execution_descr": "",
+        "execution_descr": "Files successfully loaded to dwh",
         },
     dag=dag,
     pool='postgres_dwh')
@@ -219,6 +249,6 @@ log_error = PostgresOperatorWithTemplatedParams(
     pool='postgres_dwh')
 
 start_op >> branch_op >> [load_staging, no_files_found]
-no_files_found >> log_error
+no_files_found >> archive_files >> log_error
 load_staging >> stage_metadata >> archive_metadata >> process_product_dim >> process_fact >> log_success
 load_staging >> stage_reviews >> archive_reviews >> process_reviewer_dim >> process_fact >> log_success
