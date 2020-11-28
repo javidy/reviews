@@ -2,5 +2,3 @@
 *
 # Except this file
 !.gitignore
-!processed
-!not_processed

@@ -1,4 +1,4 @@
-from airflow import DAG
+from airflow import DAG, macros
 import airflow
 from airflow.hooks.postgres_hook import PostgresHook
 from airflow.operators.python_operator import PythonOperator
@@ -53,21 +53,30 @@ def files_exist(files):
     return path.exists(files.get("meta").get("src")) and path.exists(files.get("reviews").get("src"))
 
 def detect_src_files(**kwargs):
-    source_dir = kwargs['dir']
-    files = [_ for _ in os.listdir(source_dir) if _.endswith(pattern)]
-    ti = kwargs['ti']    
+    src_dir = kwargs["src_dir"]
+    files = [_ for _ in os.listdir(src_dir) if _.endswith(pattern)]
+    ti = kwargs["ti"]
+    exec_dir = kwargs["exec_dir"]
+    print(">>EXEC DIR "+ exec_dir)
+    processed_dir = f"{archive_dir}/processed/{exec_dir}"
+    not_processed_dir = f"{archive_dir}/not_processed/{exec_dir}"
+    os.mkdir(processed_dir)
+    os.mkdir(not_processed_dir)
+    print(f"Created execution folders: {processed_dir} & {not_processed_dir}")
     if len(files) != 0:        
         start = files[0].find("_") + 1
         category = files[0][start:]
         file_names = {"meta": f"meta_{category}", "reviews": f"reviews_{category}"}
         source_files = {
             "meta": {
-                "src": os.path.join(source_dir, file_names.get("meta")),
-                "archive": os.path.join(archive_dir, file_names.get("meta"))
+                "src": os.path.join(src_dir, file_names.get("meta")),
+                "processed_dir": os.path.join(processed_dir, file_names.get("meta")),
+                "not_processed_dir": os.path.join(not_processed_dir, file_names.get("meta"))
             },
             "reviews": {
-                "src": os.path.join(source_dir, file_names.get("reviews")),
-                "archive": os.path.join(archive_dir, file_names.get("reviews"))
+                "src": os.path.join(src_dir, file_names.get("reviews")),
+                "processed_dir": os.path.join(processed_dir, file_names.get("reviews")),
+                "not_processed_dir": os.path.join(not_processed_dir, file_names.get("reviews"))            
             }
         }
         ti.xcom_push(key="source_files", value=source_files)
@@ -80,12 +89,12 @@ def archive(**kwargs):
         for key,value in d.items():
             src_file = value.get("src", "")
             if path.exists(src_file):
-                print(f">>> Archiving file {src_file}")
-                shutil.move(src_file, value.get("archive"))
+                print(f">>> Archiving not processed file {src_file}")
+                shutil.move(src_file, value.get("not_processed_dir"))
     elif data_type != None:
         src_file = d.get(data_type).get("src")
-        print(f">>> Archiving file {src_file}")
-        shutil.move(src_file, d.get(data_type).get("archive"))
+        print(f">>> Archiving processed file {src_file}")
+        shutil.move(src_file, d.get(data_type).get("processed_dir"))
     else:
         print(">>> No files found")
 
@@ -150,7 +159,7 @@ dag = DAG('reviews_dag',
 start_op = PythonOperator(
     task_id='start_task',
     provide_context=True,
-    op_kwargs = {"dir": landing_zone},
+    op_kwargs = {"src_dir": landing_zone, "exec_dir": '{{ macros.ds_format(ts_nodash, "%Y%m%dT%H%M%S", "%Y-%m-%d-%H-%M-%S") }}'},
     python_callable=detect_src_files,
     dag=dag)
 
