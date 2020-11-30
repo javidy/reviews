@@ -1,9 +1,13 @@
 \c dwh;
 
 DROP TABLE IF EXISTS staging.reviews;
+DROP TABLE IF EXISTS staging.metadata;
+DROP TABLE IF EXISTS staging.reviews_execution_log;
 DROP TABLE IF EXISTS dwh.fact_reviews;
 DROP TABLE IF EXISTS dwh.dim_date;
 DROP TABLE IF EXISTS dwh.dim_product;
+DROP TABLE IF EXISTS dwh.dim_reviewer;
+DROP TABLE IF EXISTS dwh.dim_price_bucket;
 DROP SEQUENCE IF EXISTS seq_product;
 
 

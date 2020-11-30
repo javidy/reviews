@@ -50,8 +50,8 @@ services:
         ports:
             - 5433:5432
         volumes:
-            #- ./initialize/database_user.sql:/docker-entrypoint-initdb.d/database_user.sql
-            #- ./initialize/dwh_tables.sql:/docker-entrypoint-initdb.d/dwh_tables.sql
+            - ./initialize/database_user.sql:/docker-entrypoint-initdb.d/database_user.sql
+            - ./initialize/dwh_tables.sql:/docker-entrypoint-initdb.d/dwh_tables.sql
             - pgdata:/var/lib/postgresql/data
         logging:
            options:
