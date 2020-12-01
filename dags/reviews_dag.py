@@ -151,7 +151,7 @@ def load_to_db(execution_date, **kwargs):
 
 dag = DAG('reviews_dag',
           default_args=default_args,
-          schedule_interval='*/30 * * * *',
+          schedule_interval='*/15 * * * *',
           template_searchpath=tmpl_search_path,
           max_active_runs=1,
           catchup=False
