@@ -153,6 +153,7 @@ dag = DAG('reviews_dag',
           default_args=default_args,
           schedule_interval='*/30 * * * *',
           template_searchpath=tmpl_search_path,
+          max_active_runs=1,
           catchup=False
           )
 
