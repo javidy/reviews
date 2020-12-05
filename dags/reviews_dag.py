@@ -8,7 +8,7 @@ from airflow.operators.dummy_operator import DummyOperator
 from datetime import datetime, timedelta
 import os.path, shutil
 from os import path
-import gzip, json, csv, psycopg2, glob
+import gzip, json, csv, psycopg2, glob, logging
 from airflow.models import Variable
 
 
@@ -19,6 +19,10 @@ tmpl_search_path = Variable.get("sql_path")
 output_dir = Variable.get("output_dir")
 pattern = r".json.gz"
 output_filenames = [os.path.join(output_dir, 'metadata.csv'), os.path.join(output_dir, 'reviews.csv')]
+
+logger = logging.getLogger()
+# Change format of handler for the logger
+logger.handlers[0].setFormatter(logging.Formatter('%(message)s'))
 
 connection = psycopg2.connect(
     host="dwh_db",
@@ -44,29 +48,33 @@ def branch_func(**kwargs):
     ti = kwargs['ti']
     source_filenames = ti.xcom_pull(task_ids="start_task", key="source_files")
     if source_filenames != None and files_exist(source_filenames):
-        print("Both files exists. Proceeding to staging")
+        logging.info(f">> Both files {source_filenames} exists in source directory. Proceeding to staging")
         return "load_staging"
-    print("Files not found.Proceeding to log error")
+    logging.info(">> Files not found.Proceeding to log error")
     return "no_files_found"
     
-def files_exist(files):    
+def files_exist(files):
     return path.exists(files.get("meta").get("src")) and path.exists(files.get("reviews").get("src"))
 
 def detect_src_files(**kwargs):
     src_dir = kwargs["src_dir"]
     files = [_ for _ in os.listdir(src_dir) if _.endswith(pattern)]
     ti = kwargs["ti"]
-    exec_dir = kwargs["exec_dir"]
-    print(">>EXEC DIR "+ exec_dir)
+    exec_dir = kwargs["exec_dir"]    
+    logging.info(f">> Source Directory: {src_dir}")
+    logging.info(f">> Execution Directory: {exec_dir}")
+
     processed_dir = f"{archive_dir}/processed/{exec_dir}"
     not_processed_dir = f"{archive_dir}/not_processed/{exec_dir}"
     os.mkdir(processed_dir)
     os.mkdir(not_processed_dir)
-    print(f"Created execution folders: {processed_dir} & {not_processed_dir}")
-    if len(files) != 0:        
+    logging.info(f">> Created directories: {processed_dir} & {not_processed_dir}")
+
+    if len(files) != 0:
         start = files[0].find("_") + 1
         category = files[0][start:]
         file_names = {"meta": f"meta_{category}", "reviews": f"reviews_{category}"}
+        logging.info(f">> File {files[0]} found. Preparing dictionary")
         source_files = {
             "meta": {
                 "src": os.path.join(src_dir, file_names.get("meta")),
@@ -80,45 +88,48 @@ def detect_src_files(**kwargs):
             }
         }
         ti.xcom_push(key="source_files", value=source_files)
+        logging.info(f">> Dictionary prepared and pushed to XCOM {source_files}")
 
 def archive(**kwargs):
     ti = kwargs['ti']
     data_type = kwargs["type"]
     d = ti.xcom_pull(task_ids="start_task", key="source_files")
     if d != None and data_type == None:
+        logging.info(">> Archiving not processed files...")
         for key,value in d.items():
             src_file = value.get("src", "")
             if path.exists(src_file):
-                print(f">>> Archiving not processed file {src_file}")
                 shutil.move(src_file, value.get("not_processed_dir"))
+                logging.info(f">> Archived not processed file {src_file} to {value.get('not_processed_dir')}")
     elif data_type != None:
         src_file = d.get(data_type).get("src")
-        print(f">>> Archiving processed file {src_file}")
+        logging.info(f">> Data type: {data_type} provided. Archiving only {src_file}")
         shutil.move(src_file, d.get(data_type).get("processed_dir"))
+        logging.info(f">> Archived processed file {src_file} to {d.get(data_type).get('processed_dir')}")
     else:
-        print(">>> No files found")
+        logging.info(">> No files to archive")
 
 def parse(file_name):
   if path.exists(file_name):
-    print(f'File {file_name} found. Starting processing')
+    logging.info(f">> File {file_name} found. Starting processing")
     g = gzip.open(file_name, 'rb')
     for l in g:
       yield eval(l)
   else:
-    print(f'File {path} not found')
+    logging.info(f">> File {path} not found")
 
 def load_to_db(execution_date, **kwargs):
     count, total = (0, 0)
     ti, output_filename, data_type = (kwargs["ti"], kwargs["output"], kwargs["type"])
-
     if data_type == "metadata":
       sqlstr = sqlstr_metadata
       input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("meta").get("src")
-      print(f'Processing {data_type}')
     else:
       sqlstr = sqlstr_reviews
       input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("reviews").get("src")
-      print(f'Processing {data_type}')
+    logging.info(f">> Loading data type: {data_type}")
+    logging.info(f">> Input filename {input_filename}")
+    logging.info(f">> Output filename {output_filename}")
 
     csv.register_dialect("tabs", delimiter="\t")
     data_file = open(output_filename, "w", newline='')
@@ -135,8 +146,8 @@ def load_to_db(execution_date, **kwargs):
         with open(output_filename) as f:
           cur.copy_expert(sqlstr, f)
         total = total + count
-        print("Copied data to database table. Starting new iteration")
-        print(f'Total number of copied lines {total}')
+        logging.info("Copied data to database table. Starting new iteration")
+        logging.info(f"Total number of copied lines {total}")
         data_file = open(output_filename, 'w', newline='')
         csv_writer = csv.writer(data_file, dialect="tabs")    
         count = 0
@@ -144,7 +155,7 @@ def load_to_db(execution_date, **kwargs):
     with open(output_filename) as f:
       cur.copy_expert(sqlstr, f)
     total = total + count
-    print(f'Total number of copied lines {total}')
+    logging.info(f"Total number of copied lines {total}")
     connection.commit()
     connection.close()
     return input_filename
