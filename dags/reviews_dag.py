@@ -46,66 +46,87 @@ default_args = {
 
 def branch_func(**kwargs):    
     ti = kwargs['ti']
-    source_filenames = ti.xcom_pull(task_ids="start_task", key="source_files")
-    if source_filenames != None and files_exist(source_filenames):
-        logging.info(f">> Both files {source_filenames} exists in source directory. Proceeding to staging")
+    paths_dict = ti.xcom_pull(task_ids="start_task", key="file_paths_dict")
+    file_names = ti.xcom_pull(task_ids="start_task", key="file_names")
+    exec_dir = kwargs["exec_dir"]
+
+    if paths_dict != None and files_exist(paths_dict):
+        logging.info(f">> Both files exist in landing zone: {paths_dict}. Proceeding to staging")
+        target_path = f"{archive_dir}/processed/{exec_dir}"
+        os.mkdir(target_path)
+        paths_dict["meta"]["target_path"] = os.path.join(target_path, file_names.get("meta"))
+        paths_dict["reviews"]["target_path"] = os.path.join(target_path, file_names.get("reviews"))
+
+        ti.xcom_push(key="file_paths_dict", value=paths_dict)
+        logging.info(f">> Created directory: {target_path}")
+        logging.info(f">> File paths dict prepared and pushed to XCOM {paths_dict}")
         return "load_staging"
-    logging.info(">> Files not found.Proceeding to log error")
-    return "no_files_found"
-    
+    # when no files found move on to "no_files_branch"
+    elif paths_dict == None:
+        logging.info(">> No files found in landing zone.Proceeding to no_files_found branch")
+        return "no_files_found"
+    # when only one of the files were found another NOT
+    logging.info(f">> Only one of the files exists in landing zone: {paths_dict}. Proceeding to archiving")
+    target_path = f"{archive_dir}/not_processed/{exec_dir}"
+    os.mkdir(target_path)
+    paths_dict["meta"]["target_path"] = os.path.join(target_path, file_names.get("meta"))
+    paths_dict["reviews"]["target_path"] = os.path.join(target_path, file_names.get("reviews"))
+    ti.xcom_push(key="file_paths_dict", value=paths_dict)
+    logging.info(f">> Created directory: {target_path}")
+    logging.info(f">> File paths dict prepared and pushed to XCOM {paths_dict}")
+    return "one_of_the_files_missing"
+
 def files_exist(files):
-    return path.exists(files.get("meta").get("src")) and path.exists(files.get("reviews").get("src"))
+    return path.exists(files.get("meta").get("src_path")) and path.exists(files.get("reviews").get("src_path"))
 
 def detect_src_files(**kwargs):
     src_dir = kwargs["src_dir"]
     files = [_ for _ in os.listdir(src_dir) if _.endswith(pattern)]
     ti = kwargs["ti"]
-    exec_dir = kwargs["exec_dir"]    
     logging.info(f">> Source Directory: {src_dir}")
-    logging.info(f">> Execution Directory: {exec_dir}")
-
-    processed_dir = f"{archive_dir}/processed/{exec_dir}"
-    not_processed_dir = f"{archive_dir}/not_processed/{exec_dir}"
-    os.mkdir(processed_dir)
-    os.mkdir(not_processed_dir)
-    logging.info(f">> Created directories: {processed_dir} & {not_processed_dir}")
 
     if len(files) != 0:
         start = files[0].find("_") + 1
         category = files[0][start:]
         file_names = {"meta": f"meta_{category}", "reviews": f"reviews_{category}"}
         logging.info(f">> File {files[0]} found. Preparing dictionary")
-        source_files = {
+        file_paths_dict = {
             "meta": {
-                "src": os.path.join(src_dir, file_names.get("meta")),
-                "processed_dir": os.path.join(processed_dir, file_names.get("meta")),
-                "not_processed_dir": os.path.join(not_processed_dir, file_names.get("meta"))
+                "src_path": os.path.join(src_dir, file_names.get("meta"))
             },
             "reviews": {
-                "src": os.path.join(src_dir, file_names.get("reviews")),
-                "processed_dir": os.path.join(processed_dir, file_names.get("reviews")),
-                "not_processed_dir": os.path.join(not_processed_dir, file_names.get("reviews"))            
+                "src_path": os.path.join(src_dir, file_names.get("reviews")),
             }
         }
-        ti.xcom_push(key="source_files", value=source_files)
-        logging.info(f">> Dictionary prepared and pushed to XCOM {source_files}")
+        ti.xcom_push(key="file_paths_dict", value=file_paths_dict)
+        ti.xcom_push(key="file_names", value=file_names)
+        logging.info(f">> File paths dict pushed to XCOM {file_paths_dict}")
+        logging.info(f">> File names pushed to XCOM {file_names}")
+    else:
+        logging.info(">> No files detected in landing zone")
 
 def archive(**kwargs):
     ti = kwargs['ti']
     data_type = kwargs["type"]
-    d = ti.xcom_pull(task_ids="start_task", key="source_files")
+    d = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict")
+    # when one of the files were found but another not, for instance, review_Baby.json.gz was provided but meta_Baby.json.gz not
     if d != None and data_type == None:
         logging.info(">> Archiving not processed files...")
         for key,value in d.items():
-            src_file = value.get("src", "")
-            if path.exists(src_file):
-                shutil.move(src_file, value.get("not_processed_dir"))
-                logging.info(f">> Archived not processed file {src_file} to {value.get('not_processed_dir')}")
+            src_path = value.get("src_path")
+            target_path = value.get("target_path")
+            # because one of the files will not exists need to check existence before archiving. Otherwise exception might be thrown 
+            if path.exists(src_path):
+                shutil.move(src_path, target_path)
+                logging.info(f">> Archived not processed file {src_path} to {target_path}")
+    # when file (meta or reviews) processed successfully
     elif data_type != None:
-        src_file = d.get(data_type).get("src")
-        logging.info(f">> Data type: {data_type} provided. Archiving only {src_file}")
-        shutil.move(src_file, d.get(data_type).get("processed_dir"))
-        logging.info(f">> Archived processed file {src_file} to {d.get(data_type).get('processed_dir')}")
+        src_path = d.get(data_type).get("src_path")
+        target_path = d.get(data_type).get("target_path")
+        logging.info(f">> Data type: {data_type} provided. Archiving only {src_path}")
+        shutil.move(src_path, target_path)
+        logging.info(f">> Archived processed file {src_path} to {target_path}")
+    # when no files found in landing zone
     else:
         logging.info(">> No files to archive")
 
@@ -121,12 +142,12 @@ def parse(file_name):
 def load_to_db(execution_date, **kwargs):
     count, total = (0, 0)
     ti, output_filename, data_type = (kwargs["ti"], kwargs["output"], kwargs["type"])
-    if data_type == "metadata":
+    if data_type == "meta":
       sqlstr = sqlstr_metadata
-      input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("meta").get("src")
+      input_filename = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict").get("meta").get("src_path")
     else:
       sqlstr = sqlstr_reviews
-      input_filename = ti.xcom_pull(task_ids="start_task", key="source_files").get("reviews").get("src")
+      input_filename = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict").get("reviews").get("src_path")
     logging.info(f">> Loading data type: {data_type}")
     logging.info(f">> Input filename {input_filename}")
     logging.info(f">> Output filename {output_filename}")
@@ -136,7 +157,7 @@ def load_to_db(execution_date, **kwargs):
     csv_writer = csv.writer(data_file, dialect="tabs")
 
     for l in parse(input_filename):
-      if (data_type == "metadata"):
+      if (data_type == "meta"):
         csv_writer.writerow([l.get("asin",""), l.get("imUrl", ""), l.get("description",""), l.get("categories",[[""]])[0][0], l.get("title",""), l.get("price", ""), l.get("salesRank",""), l.get("brand",""), execution_date])
       else:
         csv_writer.writerow([l.get("reviewerID",""), l.get("asin", ""), l.get("reviewerName",""), l.get("helpful",""), l.get("reviewText",""), l.get("overall",""), l.get("summary",""), l.get("unixReviewTime",""), l.get("reviewTime",""), execution_date])
@@ -171,18 +192,20 @@ dag = DAG('reviews_dag',
 start_op = PythonOperator(
     task_id='start_task',
     provide_context=True,
-    op_kwargs = {"src_dir": landing_zone, "exec_dir": '{{ macros.ds_format(ts_nodash, "%Y%m%dT%H%M%S", "%Y-%m-%d-%H-%M-%S") }}'},
+    op_kwargs = {"src_dir": landing_zone},
     python_callable=detect_src_files,
     dag=dag)
 
 branch_op = BranchPythonOperator(
-    task_id='check_if_files_exist',
+    task_id='branch_task',
     provide_context=True,
+    op_kwargs = {"exec_dir": '{{ macros.ds_format(ts_nodash, "%Y%m%dT%H%M%S", "%Y-%m-%d-%H-%M-%S") }}'},
     python_callable=branch_func,
     dag=dag)
 
 load_staging = DummyOperator(task_id='load_staging', dag=dag)
 no_files_found = DummyOperator(task_id='no_files_found', dag=dag)
+one_of_the_files_missing = DummyOperator(task_id='one_of_the_files_missing', dag=dag)
 
 archive_files = PythonOperator(
     task_id='archive_files',
@@ -193,7 +216,7 @@ archive_files = PythonOperator(
 
 stage_metadata = PythonOperator(task_id='stage_metadata',
                     python_callable=load_to_db,
-                    op_kwargs = {"output": output_filenames[0], "type": "metadata"},
+                    op_kwargs = {"output": output_filenames[0], "type": "meta"},
                     provide_context=True,
                     dag=dag)
 
@@ -264,12 +287,27 @@ log_error = PostgresOperatorWithTemplatedParams(
         "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
         "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
         "execution_status": "Error",
+        "execution_descr": f"Only one of files were found in landing zone: {landing_zone}",
+        },
+    dag=dag,
+    pool='postgres_dwh')
+
+log_info = PostgresOperatorWithTemplatedParams(
+    task_id='log_info',
+    postgres_conn_id='postgres_dwh',
+    sql='insert_execution_log.sql',
+    parameters={
+        "execution_date": "{{ execution_date }}",
+        "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
+        "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
+        "execution_status": "Info",
         "execution_descr": f"No files found in landing zone: {landing_zone}",
         },
     dag=dag,
     pool='postgres_dwh')
 
-start_op >> branch_op >> [load_staging, no_files_found]
-no_files_found >> archive_files >> log_error
+start_op >> branch_op >> [load_staging, no_files_found, one_of_the_files_missing]
+no_files_found >> log_info
+one_of_the_files_missing >> archive_files >> log_error
 load_staging >> stage_metadata >> archive_metadata >> process_product_dim >> process_fact >> log_success
 load_staging >> stage_reviews >> archive_reviews >> process_reviewer_dim >> process_fact >> log_success
