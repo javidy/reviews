@@ -284,8 +284,8 @@ log_error = PostgresOperatorWithTemplatedParams(
     sql='insert_execution_log.sql',
     parameters={
         "execution_date": "{{ execution_date }}",
-        "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
-        "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
+        "metadata_filename": '{{ ti.xcom_pull(task_ids="start_task", key="file_names").get("meta") }}',
+        "reviews_filename": '{{ ti.xcom_pull(task_ids="start_task", key="file_names").get("reviews") }}',
         "execution_status": "Error",
         "execution_descr": f"Only one of files were found in landing zone: {landing_zone}",
         },
@@ -298,8 +298,8 @@ log_info = PostgresOperatorWithTemplatedParams(
     sql='insert_execution_log.sql',
     parameters={
         "execution_date": "{{ execution_date }}",
-        "metadata_filename": '{{ ti.xcom_pull(task_ids="stage_metadata") }}',
-        "reviews_filename": '{{ ti.xcom_pull(task_ids="stage_reviews") }}',
+        "metadata_filename": 'NULL',
+        "reviews_filename": 'NULL',
         "execution_status": "Info",
         "execution_descr": f"No files found in landing zone: {landing_zone}",
         },
