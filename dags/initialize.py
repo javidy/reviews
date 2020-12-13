@@ -55,24 +55,6 @@ def initialize_connections():
                      "login": "dwh_user",
                      "password": "dwh_user"})
 
-    sql_path_var = models.Variable()
-    sql_path_var.key = "sql_path"
-    sql_path_var.set_val("/usr/local/airflow/sql")
-    landing_zone_var = models.Variable()
-    landing_zone_var.key = "landing_zone"
-    landing_zone_var.set_val("/usr/local/airflow/lz")
-    archive_dir_var = models.Variable()
-    archive_dir_var.key = "archive_dir"
-    archive_dir_var.set_val("/usr/local/airflow/archive")
-    output_dir_var = models.Variable()
-    output_dir_var.key = "output_dir"
-    output_dir_var.set_val("/usr/local/airflow/output")
-    session.add(sql_path_var)
-    session.add(landing_zone_var)
-    session.add(archive_dir_var)
-    session.add(output_dir_var)
-    session.commit()
-
     new_pool = models.Pool()
     new_pool.pool = "postgres_dwh"
     new_pool.slots = 10

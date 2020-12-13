@@ -16,21 +16,28 @@ services:
                max-file: "3"
 
     webserver:
-        image: puckel/docker-airflow:1.10.9
+        build: .
         container_name: airflow
         restart: always
         depends_on:
             - postgres
         environment:
-            - LOAD_EX=n
-            - EXECUTOR=Local            
+            - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+            - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgres://airflow:airflow@airflow_db:5432/airflow
+            - AIRFLOW__CORE__AIRFLOW_HOME=/opt/airflow/
+            - AIRFLOW__CORE__LOAD_DEFAULT_CONNECTIONS=False
+            - AIRFLOW__CORE__LOAD_EXAMPLES=False
+            - AIRFLOW_VAR_SQL_PATH=/opt/airflow/sql
+            - AIRFLOW_VAR_LANDING_ZONE=/opt/airflow/lz
+            - AIRFLOW_VAR_ARCHIVE_DIR=/opt/airflow/archive
+            - AIRFLOW_VAR_OUTPUT_DIR=/opt/airflow/output
         volumes:
-            - ./dags:/usr/local/airflow/dags
-            - ./sql:/usr/local/airflow/sql
-            - ./src:/usr/local/airflow/src
-            - ./lz:/usr/local/airflow/lz
-            - ./archive:/usr/local/airflow/archive
-            - ./output:/usr/local/airflow/output
+            - ./dags:/opt/airflow/dags
+            - ./sql:/opt/airflow/sql
+            - ./src:/opt/airflow/src
+            - ./lz:/opt/airflow/lz
+            - ./archive:/opt/airflow/archive
+            - ./output:/opt/airflow/output
         ports:
             - "8084:8080"
         command: webserver
