@@ -47,15 +47,15 @@ default_args = {
 def branch_func(**kwargs):    
     ti = kwargs['ti']
     paths_dict = ti.xcom_pull(task_ids="start_task", key="file_paths_dict")
-    file_names = ti.xcom_pull(task_ids="start_task", key="file_names")
+    src_file_names = ti.xcom_pull(task_ids="start_task", key="src_file_names")
     exec_dir = kwargs["exec_dir"]
 
     if paths_dict != None and files_exist(paths_dict):
         logging.info(f">> Both files exist in landing zone: {paths_dict}. Proceeding to staging")
         target_path = f"{archive_dir}/processed/{exec_dir}"
         os.mkdir(target_path)
-        paths_dict["metadata"]["target_path"] = os.path.join(target_path, file_names.get("metadata"))
-        paths_dict["reviews"]["target_path"] = os.path.join(target_path, file_names.get("reviews"))
+        paths_dict["metadata"]["target_path"] = os.path.join(target_path, src_file_names.get("metadata"))
+        paths_dict["reviews"]["target_path"] = os.path.join(target_path, src_file_names.get("reviews"))
 
         ti.xcom_push(key="file_paths_dict", value=paths_dict)
         logging.info(f">> Created directory: {target_path}")
@@ -69,8 +69,8 @@ def branch_func(**kwargs):
     logging.info(f">> Only one of the files exists in landing zone: {paths_dict}. Proceeding to archiving")
     target_path = f"{archive_dir}/not_processed/{exec_dir}"
     os.mkdir(target_path)
-    paths_dict["metadata"]["target_path"] = os.path.join(target_path, file_names.get("metadata"))
-    paths_dict["reviews"]["target_path"] = os.path.join(target_path, file_names.get("reviews"))
+    paths_dict["metadata"]["target_path"] = os.path.join(target_path, src_file_names.get("metadata"))
+    paths_dict["reviews"]["target_path"] = os.path.join(target_path, src_file_names.get("reviews"))
     ti.xcom_push(key="file_paths_dict", value=paths_dict)
     logging.info(f">> Created directory: {target_path}")
     logging.info(f">> File paths dict prepared and pushed to XCOM {paths_dict}")
@@ -88,20 +88,20 @@ def detect_src_files(**kwargs):
     if len(files) != 0:
         start = files[0].find("_") + 1
         category = files[0][start:]
-        file_names = {"metadata": f"meta_{category}", "reviews": f"reviews_{category}"}
+        src_file_names = {"metadata": f"meta_{category}", "reviews": f"reviews_{category}"}
         logging.info(f">> File {files[0]} found. Preparing dictionary")
         file_paths_dict = {
             "metadata": {
-                "src_path": os.path.join(src_dir, file_names.get("metadata"))
+                "src_path": os.path.join(src_dir, src_file_names.get("metadata"))
             },
             "reviews": {
-                "src_path": os.path.join(src_dir, file_names.get("reviews")),
+                "src_path": os.path.join(src_dir, src_file_names.get("reviews")),
             }
         }
         ti.xcom_push(key="file_paths_dict", value=file_paths_dict)
-        ti.xcom_push(key="file_names", value=file_names)
+        ti.xcom_push(key="src_file_names", value=src_file_names)
         logging.info(f">> File paths dict pushed to XCOM {file_paths_dict}")
-        logging.info(f">> File names pushed to XCOM {file_names}")
+        logging.info(f">> File names pushed to XCOM {src_file_names}")
     else:
         logging.info(">> No files detected in landing zone")
 
@@ -144,19 +144,19 @@ def load_to_db(execution_date, **kwargs):
     ti, output_filename, data_type = (kwargs["ti"], kwargs["output"], kwargs["type"])
     if data_type == "metadata":
       sqlstr = sqlstr_metadata
-      input_filename = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict").get("metadata").get("src_path")
+      src_filename = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict").get("metadata").get("src_path")
     else:
       sqlstr = sqlstr_reviews
-      input_filename = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict").get("reviews").get("src_path")
+      src_filename = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict").get("reviews").get("src_path")
     logging.info(f">> Loading data type: {data_type}")
-    logging.info(f">> Input filename {input_filename}")
+    logging.info(f">> Source filename {src_filename}")
     logging.info(f">> Output filename {output_filename}")
 
     csv.register_dialect("tabs", delimiter="\t")
     data_file = open(output_filename, "w", newline='')
     csv_writer = csv.writer(data_file, dialect="tabs")
 
-    for l in parse(input_filename):
+    for l in parse(src_filename):
       if (data_type == "metadata"):
         csv_writer.writerow([l.get("asin",""), l.get("imUrl", ""), l.get("description",""), l.get("categories",[[""]])[0][0], l.get("title",""), l.get("price", ""), l.get("salesRank",""), l.get("brand",""), execution_date])
       else:
@@ -179,7 +179,7 @@ def load_to_db(execution_date, **kwargs):
     logging.info(f"Total number of copied lines {total}")
     connection.commit()
     connection.close()
-    return input_filename
+    return src_filename
 
 dag = DAG('reviews_dag',
           default_args=default_args,
@@ -284,8 +284,8 @@ log_error = PostgresOperatorWithTemplatedParams(
     sql='insert_execution_log.sql',
     parameters={
         "execution_date": "{{ execution_date }}",
-        "metadata_filename": '{{ ti.xcom_pull(task_ids="start_task", key="file_names").get("metadata") }}',
-        "reviews_filename": '{{ ti.xcom_pull(task_ids="start_task", key="file_names").get("reviews") }}',
+        "metadata_filename": '{{ ti.xcom_pull(task_ids="start_task", key="src_file_names").get("metadata") }}',
+        "reviews_filename": '{{ ti.xcom_pull(task_ids="start_task", key="src_file_names").get("reviews") }}',
         "execution_status": "Error",
         "execution_descr": f"Only one of files were found in landing zone: {landing_zone}",
         },
