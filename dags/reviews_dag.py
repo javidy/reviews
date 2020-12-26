@@ -178,6 +178,7 @@ def load_to_db(execution_date, **kwargs):
     total = total + count
     logging.info(f"Total number of copied lines {total}")
     connection.commit()
+    cur.close()
     connection.close()
     return src_filename
 
