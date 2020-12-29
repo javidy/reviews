@@ -57,7 +57,7 @@ def initialize_connections():
 
     new_pool = models.Pool()
     new_pool.pool = "postgres_dwh"
-    new_pool.slots = 10
+    new_pool.slots = 100
     new_pool.description = "Allows max. 10 connections to the DWH"
 
     session.add(new_pool)
