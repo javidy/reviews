@@ -5,7 +5,5 @@ python:
 services:
   - docker
 
-before_script: pip install docker-compose
-
 script:
   - docker-compose -f docker-compose-LocalExecutor.yml up -d
