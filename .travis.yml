@@ -6,4 +6,4 @@ services:
   - docker
 
 script:
-  - docker-compose run webserver
+  - docker-compose up -d
