@@ -7,3 +7,4 @@ services:
 
 script:
   - docker-compose up -d
+  - ./wait-for-it.sh airflow_db:5432 -t 180 --strict
