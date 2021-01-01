@@ -7,5 +7,5 @@ services:
 
 script:
   - docker-compose up -d
-  - scripts/wait-for-it.sh airflow:8084 --timeout=180 --strict -- echo "airflow is up"
+  - scripts/wait-for-it.sh localhost:8084 --timeout=180 --strict -- echo "airflow is up"
   - docker exec -ti airflow sh -c "cd dags && python reviews_dag.py && python cleanup_dag.py && python initialize.py"
