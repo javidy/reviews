@@ -7,4 +7,4 @@ services:
 
 script:
   - docker-compose up -d
-  - scripts/wait-for-it.sh airflow_db:5432 --timeout=60 --strict -- echo "airflow_db is up"
+  - scripts/wait-for-it.sh airflow_db:5432 --timeout=180 --strict -- echo "airflow_db is up"
