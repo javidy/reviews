@@ -6,4 +6,4 @@ services:
   - docker
 
 script:
-  - docker-compose -f docker-compose-LocalExecutor.yml up -d
+  - docker-compose run webserver
