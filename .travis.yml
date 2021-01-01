@@ -7,4 +7,4 @@ services:
 
 script:
   - docker-compose up -d
-  - ./wait-for-it.sh airflow_db:5432 -t 180 --strict
+  - .scripts/wait-for-it.sh www.google.com:81 --timeout=1 --strict -- echo "google is up"
