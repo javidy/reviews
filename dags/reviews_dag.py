@@ -25,7 +25,7 @@ logger = logging.getLogger()
 logger.handlers[0].setFormatter(logging.Formatter('%(message)s'))
 
 connection = psycopg2.connect(
-    host="dwh_db",
+    host="dwh",
     database="dwh",
     user="dwh_user",
     password="dwh_user",

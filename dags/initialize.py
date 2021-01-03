@@ -49,7 +49,7 @@ def initialize_connections():
     create_new_conn(session,
                     {"conn_id": "postgres_dwh",
                      "conn_type": "postgres",
-                     "host": "dwh_db",
+                     "host": "dwh",
                      "port": 5432,
                      "schema": "dwh",
                      "login": "dwh_user",
