@@ -17,6 +17,7 @@ services:
             context: .
             target: reviews_airflow
         image: jyoff/reviews_airflow:latest
+        container_name: airflow
         restart: always
         depends_on:
             - airflow_db
