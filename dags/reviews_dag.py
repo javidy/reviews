@@ -52,7 +52,7 @@ def branch_func(**kwargs):
 
     if paths_dict != None and files_exist(paths_dict):
         logging.info(f">> Both files exist in landing zone: {paths_dict}. Proceeding to staging")
-        target_path = f"{archive_dir}/processed/{exec_dir}"
+        target_path = f"{archive_dir}/{exec_dir}"
         os.mkdir(target_path)
         paths_dict["metadata"]["target_path"] = os.path.join(target_path, src_file_names.get("metadata"))
         paths_dict["reviews"]["target_path"] = os.path.join(target_path, src_file_names.get("reviews"))
@@ -67,7 +67,7 @@ def branch_func(**kwargs):
         return "no_files_found"
     # when only one of the files were found another NOT
     logging.info(f">> Only one of the files exists in landing zone: {paths_dict}. Proceeding to archiving")
-    target_path = f"{archive_dir}/not_processed/{exec_dir}"
+    target_path = f"{archive_dir}/{exec_dir}"
     os.mkdir(target_path)
     paths_dict["metadata"]["target_path"] = os.path.join(target_path, src_file_names.get("metadata"))
     paths_dict["reviews"]["target_path"] = os.path.join(target_path, src_file_names.get("reviews"))
