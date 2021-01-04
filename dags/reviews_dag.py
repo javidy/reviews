@@ -246,24 +246,21 @@ process_product_dim = PostgresOperatorWithTemplatedParams(
     postgres_conn_id='postgres_dwh',
     sql='process_product_dimension.sql',
     parameters={"execution_date": "{{ execution_date }}"},
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 process_reviewer_dim = PostgresOperatorWithTemplatedParams(
     task_id='process_reviewer_dim',
     postgres_conn_id='postgres_dwh',
     sql='process_reviewer_dimension.sql',
     parameters={"execution_date": "{{ execution_date }}"},
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 process_fact = PostgresOperatorWithTemplatedParams(
     task_id='process_fact',
     postgres_conn_id='postgres_dwh',
     sql='process_review_fact.sql',
     parameters={"execution_date": "{{ execution_date }}"},
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 log_success = PostgresOperatorWithTemplatedParams(
     task_id='log_success',
@@ -276,8 +273,7 @@ log_success = PostgresOperatorWithTemplatedParams(
         "execution_status": "Success",
         "execution_descr": "Files successfully loaded to dwh",
         },
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 log_error = PostgresOperatorWithTemplatedParams(
     task_id='log_error',
@@ -290,8 +286,7 @@ log_error = PostgresOperatorWithTemplatedParams(
         "execution_status": "Error",
         "execution_descr": f"Only one of files were found in landing zone: {landing_zone}",
         },
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 log_info = PostgresOperatorWithTemplatedParams(
     task_id='log_info',
@@ -304,8 +299,7 @@ log_info = PostgresOperatorWithTemplatedParams(
         "execution_status": "Info",
         "execution_descr": f"No files found in landing zone: {landing_zone}",
         },
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 start_op >> branch_op >> [load_staging, no_files_found, one_of_the_files_missing]
 no_files_found >> log_info

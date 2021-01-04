@@ -23,7 +23,6 @@ cleanup = PostgresOperatorWithTemplatedParams(
     task_id='cleanup',
     postgres_conn_id='postgres_dwh',
     sql='cleanup.sql',
-    dag=dag,
-    pool='postgres_dwh')
+    dag=dag)
 
 cleanup

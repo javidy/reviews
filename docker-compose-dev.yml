@@ -6,22 +6,29 @@ services:
             - POSTGRES_USER=airflow
             - POSTGRES_PASSWORD=airflow
             - POSTGRES_DB=airflow
-            - POSTGRES_HOST_AUTH_METHOD=trust      
+            - POSTGRES_HOST_AUTH_METHOD=trust
         logging:
            options:
                max-size: 10m
                max-file: "3"
 
     airflow:
+        build:
+            context: .
+            target: reviews_airflow
         image: jyoff/reviews_airflow:latest
+        container_name: airflow
         restart: always
         depends_on:
             - airflow_db
         environment:
             - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgres://airflow:airflow@airflow_db:5432/airflow
         volumes:
+            - ./dags:/opt/airflow/dags
+            - ./sql:/opt/airflow/sql
             - ./landing_zone:/opt/airflow/landing_zone
             - ./archive:/opt/airflow/archive
+            - ./output:/opt/airflow/output
         ports:
             - "8084:8080"
         command: webserver
@@ -31,10 +38,20 @@ services:
             timeout: 30s
             retries: 3
     dwh:
+        build:
+            context: .
+            target: reviews_dwh
         image: jyoff/reviews_dwh:latest
+        environment:
+            - POSTGRES_USER=dwh_user
+            - POSTGRES_PASSWORD=dwh_user
+            - POSTGRES_DB=dwh
+            - POSTGRES_HOST_AUTH_METHOD=trust
         ports:
             - 5432:5432
         volumes:
+            - ./initialize/database_user.sql:/docker-entrypoint-initdb.d/database_user.sql
+            - ./initialize/dwh_tables.sql:/docker-entrypoint-initdb.d/dwh_tables.sql
             - pgdata:/var/lib/postgresql/data
         logging:
            options:
