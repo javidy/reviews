@@ -187,7 +187,8 @@ dag = DAG('reviews_dag',
           schedule_interval='*/15 * * * *',
           template_searchpath=tmpl_search_path,
           max_active_runs=1,
-          catchup=False
+          catchup=False,
+          is_paused_upon_creation=False
           )
 
 start_op = PythonOperator(
