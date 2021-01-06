@@ -11,7 +11,7 @@ SELECT
     , COALESCE(p.brand, '')
     , COALESCE(p.price, 0)
     , COALESCE(p.img_url, '')
-    , COALESCE(p.categories, '')
+    , COALESCE(p.category, '')
     , COALESCE(p.sales_rank, '')
     , b.price_bucket_key
     , TIMESTAMP %(execution_date)s

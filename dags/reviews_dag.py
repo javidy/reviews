@@ -32,7 +32,7 @@ connection = psycopg2.connect(
 )
 connection.autocommit = False
 cur = connection.cursor()
-sqlstr_metadata = "COPY staging.metadata (asin, img_url, description, categories, title, price, sales_rank, brand, load_dtm) FROM STDIN DELIMITER '\t' CSV"
+sqlstr_metadata = "COPY staging.metadata (asin, img_url, description, category, title, price, sales_rank, brand, load_dtm) FROM STDIN DELIMITER '\t' CSV"
 sqlstr_reviews = "COPY staging.reviews (reviewer_id, asin, reviewer_name, helpful, review_text, rating, summary, unix_review_time, review_date, load_dtm) FROM STDIN DELIMITER '\t' CSV"
 
 ## Define the DAG object
@@ -40,7 +40,7 @@ default_args = {
     'owner': 'airflow',
     'depends_on_past': False,
     'start_date': datetime(2020, 11, 8, 12, 30),
-    'retries': 5,
+    'retries': 2,
     'retry_delay': timedelta(minutes=1),
 }
 
@@ -158,9 +158,9 @@ def load_to_db(execution_date, **kwargs):
 
     for l in parse(src_filename):
       if (data_type == "metadata"):
-        csv_writer.writerow([l.get("asin",""), l.get("imUrl", ""), l.get("description",""), l.get("categories",[[""]])[0][0], l.get("title",""), l.get("price", ""), l.get("salesRank",""), l.get("brand",""), execution_date])
+        csv_writer.writerow([l.get("asin",""), l.get("imUrl", "")[:500], l.get("description",""), l.get("categories",[[""]])[0][0][:500], l.get("title","")[:500], l.get("price", ""), l.get("salesRank",""), l.get("brand","")[:500], execution_date])
       else:
-        csv_writer.writerow([l.get("reviewerID",""), l.get("asin", ""), l.get("reviewerName",""), l.get("helpful",""), l.get("reviewText",""), l.get("overall",""), l.get("summary",""), l.get("unixReviewTime",""), l.get("reviewTime",""), execution_date])
+        csv_writer.writerow([l.get("reviewerID",""), l.get("asin", ""), l.get("reviewerName","")[:500], l.get("helpful","")[:50], l.get("reviewText",""), l.get("overall",""), l.get("summary","")[:1000], l.get("unixReviewTime",""), l.get("reviewTime",""), execution_date])
       count = count + 1
       if (count == 100000):    
         data_file.close()    
@@ -184,7 +184,7 @@ def load_to_db(execution_date, **kwargs):
 
 dag = DAG('reviews_dag',
           default_args=default_args,
-          schedule_interval='*/15 * * * *',
+          schedule_interval='*/10 * * * *',
           template_searchpath=tmpl_search_path,
           max_active_runs=1,
           catchup=False,
