@@ -118,6 +118,14 @@ CREATE TABLE dwh.fact_reviews (
     rating           FLOAT NOT NULL
 );
 
+-- Constraint: fact_reviews_unique_key
+
+-- ALTER TABLE dwh.fact_reviews DROP CONSTRAINT fact_reviews_unique_key;
+
+ALTER TABLE dwh.fact_reviews
+    ADD CONSTRAINT fact_reviews_unique_key UNIQUE (date_key, reviewer_key, product_key);
+
+
 GRANT USAGE ON SCHEMA dwh TO dwh_user;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA dwh TO dwh_user;
 

@@ -23,8 +23,10 @@ FROM
 INNER JOIN dwh.dim_date d ON d.review_date = r.review_date::date
 INNER JOIN dwh.dim_product p ON p.product_id = r.asin AND r.load_dtm >= p.start_dtm AND r.load_dtm < p.end_dtm
 INNER JOIN dwh.dim_reviewer rw ON rw.reviewer_id = r.reviewer_id
-WHERE
-    r.load_dtm = %(execution_date)s;
+WHERE 1=1
+  and r.load_dtm = %(execution_date)s
+ON CONFLICT ON CONSTRAINT fact_reviews_unique_key
+DO UPDATE SET rating = excluded.rating;
 
 
 -- Constraint: fact_reviews_date_key_fkey
