@@ -57,15 +57,15 @@ services:
            options:
                max-size: 10m
                max-file: "3"
-    dashboard:
-        image: metabase/metabase
-        container_name: metabase
-        ports:
-            - 3000:3000
-        volumes:
-            - ./metabase-data:/metabase-data
-        environment: 
-            - MB_DB_FILE=/metabase-data
+    # dashboard:
+    #     image: metabase/metabase
+    #     container_name: metabase
+    #     ports:
+    #         - 3000:3000
+    #     volumes:
+    #         - ./metabase-data:/metabase-data
+    #     environment:
+    #         - MB_DB_FILE=/metabase-data
             
 volumes:
     pgdata:

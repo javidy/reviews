@@ -3,6 +3,19 @@ CREATE TEMP TABLE merge_product (LIKE dwh.dim_product);
 
 -- The staging table should only have at most one record per product
 INSERT INTO merge_product
+(
+    product_key
+   ,product_id
+   ,product_title
+   ,product_brand
+   ,product_price
+   ,product_image_url
+   ,product_category
+   ,product_sales_rank
+   ,price_bucket_key
+   ,start_dtm
+   ,end_dtm
+)
 SELECT
     DISTINCT
     0
@@ -14,13 +27,15 @@ SELECT
     , COALESCE(p.category, '')
     , COALESCE(p.sales_rank, '')
     , b.price_bucket_key
-    , TIMESTAMP %(execution_date)s
+    , COALESCE(MIN(r.review_date), '1901-01-01 00:00:00')
     , TIMESTAMP '9999-01-01 00:00:00'
 FROM
-    staging.metadata p INNER JOIN
+    staging.metadata p LEFT JOIN
+    staging.reviews r ON (p.asin = r.asin) INNER JOIN
     dwh.dim_price_bucket b ON (COALESCE(p.price, 0) >= b.range_start AND COALESCE(p.price, 0) < COALESCE(b.range_end, p.price))
 WHERE 
-    p.load_dtm = %(execution_date)s;
+    p.load_dtm = %(execution_date)s
+GROUP BY 1,2,3,4,5,6,7,8,9,11;
 
 -- Update records by setting an end date
 -- only do this when start_dtm < to be inserted dtm,
@@ -35,7 +50,7 @@ FROM
 WHERE
         target.product_id  = source.product_id
 AND     target.end_dtm    >= TIMESTAMP '9999-01-01 00:00:00'
-AND     target.start_dtm   < source.start_dtm
+AND     target.start_dtm   <= source.start_dtm
 AND EXISTS (
         SELECT source.product_id, source.product_title, source.product_brand, source.product_price, source.product_image_url, source.product_category, source.product_sales_rank
         EXCEPT

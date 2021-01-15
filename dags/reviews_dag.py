@@ -107,25 +107,19 @@ def detect_src_files(**kwargs):
 
 def archive(**kwargs):
     ti = kwargs['ti']
-    data_type = kwargs["type"]
     d = ti.xcom_pull(task_ids="branch_task", key="file_paths_dict")
     # when one of the files were found but another not, for instance, review_Baby.json.gz was provided but meta_Baby.json.gz not
-    if d != None and data_type == None:
-        logging.info(">> Archiving not processed files...")
+    if d != None:
+        logging.info(">> Archiving files...")
         for key,value in d.items():
             src_path = value.get("src_path")
             target_path = value.get("target_path")
-            # because one of the files will not exists need to check existence before archiving. Otherwise exception might be thrown 
+            # check source file existence before attempting to move
+            # in case one of the files is missing only existing file can be moved
+            # this is to avid exception, might be better handled by try catch
             if path.exists(src_path):
                 shutil.move(src_path, target_path)
-                logging.info(f">> Archived not processed file {src_path} to {target_path}")
-    # when file (metadata or reviews) processed successfully
-    elif data_type != None:
-        src_path = d.get(data_type).get("src_path")
-        target_path = d.get(data_type).get("target_path")
-        logging.info(f">> Data type: {data_type} provided. Archiving only {src_path}")
-        shutil.move(src_path, target_path)
-        logging.info(f">> Archived processed file {src_path} to {target_path}")
+                logging.info(f">> Archived file {src_path} to {target_path}")
     # when no files found in landing zone
     else:
         logging.info(">> No files to archive")
@@ -209,10 +203,9 @@ load_staging = DummyOperator(task_id='load_staging', dag=dag)
 no_files_found = DummyOperator(task_id='no_files_found', dag=dag)
 one_of_the_files_missing = DummyOperator(task_id='one_of_the_files_missing', dag=dag)
 
-archive_files = PythonOperator(
-    task_id='archive_files',
+archive_file = PythonOperator(
+    task_id='archive_file',
     python_callable=archive,
-    op_kwargs = {"type": None},
     provide_context=True,
     dag=dag)
 
@@ -222,23 +215,15 @@ stage_metadata = PythonOperator(task_id='stage_metadata',
                     provide_context=True,
                     dag=dag)
 
-archive_metadata = PythonOperator(
-    task_id='archive_metadata',
-    python_callable=archive,
-    op_kwargs = {"type": "metadata"},
-    provide_context=True,
-    dag=dag)
-
 stage_reviews = PythonOperator(task_id='stage_reviews',
                     python_callable=load_to_db,
                     op_kwargs = {"output": output_filenames[1], "type": "reviews"},
                     provide_context=True,
                     dag=dag)
 
-archive_reviews = PythonOperator(
-    task_id='archive_reviews',
+archive_files = PythonOperator(
+    task_id='archive_files',
     python_callable=archive,
-    op_kwargs = {"type": "reviews"},
     provide_context=True,
     dag=dag)
 
@@ -304,6 +289,8 @@ log_info = PostgresOperatorWithTemplatedParams(
 
 start_op >> branch_op >> [load_staging, no_files_found, one_of_the_files_missing]
 no_files_found >> log_info
-one_of_the_files_missing >> archive_files >> log_error
-load_staging >> stage_metadata >> archive_metadata >> process_product_dim >> process_fact >> log_success
-load_staging >> stage_reviews >> archive_reviews >> process_reviewer_dim >> process_fact >> log_success
+one_of_the_files_missing >> archive_file >> log_error
+load_staging >> stage_metadata >> archive_files >> process_product_dim >> process_fact >> log_success
+load_staging >> stage_reviews  >> archive_files >> process_product_dim >> process_fact >> log_success
+load_staging >> stage_metadata >> archive_files >> process_reviewer_dim >> process_fact >> log_success
+load_staging >> stage_reviews  >> archive_files >> process_reviewer_dim >> process_fact >> log_success
