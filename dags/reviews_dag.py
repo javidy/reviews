@@ -200,6 +200,7 @@ branch_op = BranchPythonOperator(
     dag=dag)
 
 load_staging = DummyOperator(task_id='load_staging', dag=dag)
+staging_completed = DummyOperator(task_id='staging_completed', dag=dag)
 no_files_found = DummyOperator(task_id='no_files_found', dag=dag)
 one_of_the_files_missing = DummyOperator(task_id='one_of_the_files_missing', dag=dag)
 
@@ -225,6 +226,7 @@ archive_files = PythonOperator(
     task_id='archive_files',
     python_callable=archive,
     provide_context=True,
+    trigger_rule="none_skipped",
     dag=dag)
 
 process_product_dim = PostgresOperatorWithTemplatedParams(
@@ -290,7 +292,8 @@ log_info = PostgresOperatorWithTemplatedParams(
 start_op >> branch_op >> [load_staging, no_files_found, one_of_the_files_missing]
 no_files_found >> log_info
 one_of_the_files_missing >> archive_file >> log_error
-load_staging >> stage_metadata >> archive_files >> process_product_dim >> process_fact >> log_success
-load_staging >> stage_reviews  >> archive_files >> process_product_dim >> process_fact >> log_success
-load_staging >> stage_metadata >> archive_files >> process_reviewer_dim >> process_fact >> log_success
-load_staging >> stage_reviews  >> archive_files >> process_reviewer_dim >> process_fact >> log_success
+load_staging >> stage_metadata >> staging_completed
+load_staging >> stage_reviews  >> staging_completed
+staging_completed >> archive_files
+staging_completed >> process_reviewer_dim >> process_fact >> log_success
+staging_completed >> process_product_dim >> process_fact >> log_success
