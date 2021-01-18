@@ -178,7 +178,7 @@ def load_to_db(execution_date, **kwargs):
 
 dag = DAG('reviews_dag',
           default_args=default_args,
-          schedule_interval='*/10 * * * *',
+          schedule_interval='*/20 * * * *',
           template_searchpath=tmpl_search_path,
           max_active_runs=1,
           catchup=False,
@@ -263,8 +263,8 @@ log_success = PostgresOperatorWithTemplatedParams(
         },
     dag=dag)
 
-log_error = PostgresOperatorWithTemplatedParams(
-    task_id='log_error',
+log_error_1 = PostgresOperatorWithTemplatedParams(
+    task_id='log_error_1',
     postgres_conn_id='postgres_dwh',
     sql='insert_execution_log.sql',
     parameters={
@@ -272,8 +272,22 @@ log_error = PostgresOperatorWithTemplatedParams(
         "metadata_filename": '{{ ti.xcom_pull(task_ids="start_task", key="src_file_names").get("metadata") }}',
         "reviews_filename": '{{ ti.xcom_pull(task_ids="start_task", key="src_file_names").get("reviews") }}',
         "execution_status": "Error",
-        "execution_descr": f"Only one of files were found in landing zone: {landing_zone}",
+        "execution_descr": f"Only one file was found in landing zone: {landing_zone}",
         },
+    dag=dag)
+
+log_error_2 = PostgresOperatorWithTemplatedParams(
+    task_id='log_error_2',
+    postgres_conn_id='postgres_dwh',
+    sql='insert_execution_log.sql',
+    parameters={
+        "execution_date": "{{ execution_date }}",
+        "metadata_filename": '{{ ti.xcom_pull(task_ids="start_task", key="src_file_names").get("metadata") }}',
+        "reviews_filename": '{{ ti.xcom_pull(task_ids="start_task", key="src_file_names").get("reviews") }}',
+        "execution_status": "Error",
+        "execution_descr": f"Error in processing one of the files.Staging not completed successfully",
+        },
+    trigger_rule="all_failed",
     dag=dag)
 
 log_info = PostgresOperatorWithTemplatedParams(
@@ -291,9 +305,10 @@ log_info = PostgresOperatorWithTemplatedParams(
 
 start_op >> branch_op >> [load_staging, no_files_found, one_of_the_files_missing]
 no_files_found >> log_info
-one_of_the_files_missing >> archive_file >> log_error
+one_of_the_files_missing >> archive_file >> log_error_1
 load_staging >> stage_metadata >> staging_completed
 load_staging >> stage_reviews  >> staging_completed
 staging_completed >> archive_files
+staging_completed >> log_error_2
 staging_completed >> process_reviewer_dim >> process_fact >> log_success
 staging_completed >> process_product_dim >> process_fact >> log_success
