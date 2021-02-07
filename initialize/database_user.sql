@@ -8,3 +8,4 @@
 
 CREATE SCHEMA dwh AUTHORIZATION dwh_user;
 CREATE SCHEMA staging AUTHORIZATION dwh_user;
+ALTER ROLE dwh_user SET work_mem TO '2GB';
