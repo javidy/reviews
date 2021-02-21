@@ -14,10 +14,12 @@ ENV AIRFLOW_CONN_POSTGRES_DWH=postgres://dwh_user:dwh_user@dwh:5432/dwh
 
 WORKDIR $AIRFLOW__CORE__AIRFLOW_HOME
 RUN mkdir sql \
- && mkdir output
+ && mkdir output \
+ && mkdir config
 
 COPY dags dags
 COPY sql sql
+COPY config config
 COPY scripts/entrypoint.sh /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
