@@ -17,19 +17,20 @@ landing_zone = Variable.get("landing_zone")
 archive_dir = Variable.get("archive_dir")
 tmpl_search_path = Variable.get("sql_path")
 output_dir = Variable.get("output_dir")
+config_dir = Variable.get("config_dir")
 pattern = r".json.gz"
 output_filenames = [os.path.join(output_dir, 'metadata.csv'), os.path.join(output_dir, 'reviews.csv')]
+db_config_file = os.path.join(config_dir, 'db_config.json')
 
 logger = logging.getLogger()
 # Change format of handler for the logger
 logger.handlers[0].setFormatter(logging.Formatter('%(message)s'))
 
-connection = psycopg2.connect(
-    host="dwh",
-    database="dwh",
-    user="dwh_user",
-    password="dwh_user",
-)
+# read dwh details into dictionary
+with open(db_config_file, 'r') as f:
+    db_config = json.load(f)
+
+connection = psycopg2.connect(**db_config)
 connection.autocommit = False
 cur = connection.cursor()
 sqlstr_metadata = "COPY staging.metadata (asin, img_url, description, category, title, price, sales_rank, brand, load_dtm) FROM STDIN DELIMITER '\t' CSV"

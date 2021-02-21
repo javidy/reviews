@@ -1,0 +1,6 @@
+{
+    "host":"dwh",
+    "database":"dwh",
+    "user":"dwh_user",
+    "password":"dwh_user"
+}

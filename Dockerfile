@@ -9,6 +9,7 @@ ENV AIRFLOW_VAR_SQL_PATH=/opt/airflow/sql
 ENV AIRFLOW_VAR_LANDING_ZONE=/opt/airflow/landing_zone
 ENV AIRFLOW_VAR_ARCHIVE_DIR=/opt/airflow/archive
 ENV AIRFLOW_VAR_OUTPUT_DIR=/opt/airflow/output
+ENV AIRFLOW_VAR_CONFIG_DIR=/opt/airflow/config
 ENV AIRFLOW_CONN_POSTGRES_DWH=postgres://dwh_user:dwh_user@dwh:5432/dwh
 
 WORKDIR $AIRFLOW__CORE__AIRFLOW_HOME

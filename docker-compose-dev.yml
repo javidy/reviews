@@ -29,6 +29,7 @@ services:
             - ./landing_zone:/opt/airflow/landing_zone
             - ./archive:/opt/airflow/archive
             - ./output:/opt/airflow/output
+            - ./config:/opt/airflow/config
         ports:
             - "8084:8080"
         command: webserver
