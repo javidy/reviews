@@ -29,6 +29,10 @@ DWH details:
 
 Once all the data files loaded to star schema, you can connect to dwh with BI tool of your choice to do the reporting. You can also use [metabase](https://www.metabase.com/) for visualization and reporting which will be available at localhost:3000.
 
+## DAG
+Below is the screenshot of Airflow DAG for populating staging/dimension/fact tables. Dag has branch task for handling scenarios different scenarios such as files not found, one of the files missing , or happy path (files found). 
+<img width="1428" alt="Screenshot 2021-05-24 at 21 24 36" src="https://user-images.githubusercontent.com/7736273/119397542-909a8100-bcd6-11eb-9f9d-ef9c474c5d62.png">
+
 ## Sample Reports from metabase
 ## Source files naming convention
 ## Data Model
